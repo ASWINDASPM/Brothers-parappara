@@ -1,15 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import { UPCOMING_EVENTS, NEWS_UPDATES, GALLERY_MOMENTS } from '../data/mockData';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+// Strip trailing /rest/v1 or /rest/v1/ or trailing slash
+const supabaseUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
 export const isSupabaseConfigured = () => {
   return Boolean(
     supabaseUrl && 
     supabaseAnonKey && 
-    supabaseUrl !== 'https://your-project.supabase.co' && 
-    supabaseAnonKey !== 'your-anon-key'
+    supabaseUrl.startsWith('https://') &&
+    !supabaseUrl.includes('your-project') && 
+    !supabaseAnonKey.includes('your-anon-key')
   );
 };
 
