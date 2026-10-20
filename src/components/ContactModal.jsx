@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, MapPin, Phone, Mail, Send, CheckCircle2 } from 'lucide-react';
 import ClubLogo from './ClubLogo';
+import { sendContactMessageToSupabase } from '../lib/supabase';
 
 export default function ContactModal({ isOpen, onClose }) {
   const [sent, setSent] = useState(false);
@@ -8,9 +9,13 @@ export default function ContactModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.message) return;
+    
+    // Save contact message to Supabase
+    await sendContactMessageToSupabase(form);
+
     setSent(true);
     setTimeout(() => {
       setSent(false);

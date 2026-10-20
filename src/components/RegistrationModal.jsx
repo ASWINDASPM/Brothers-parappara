@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, Trophy, Palette, Users, ArrowRight } from 'lucide-react';
 import ClubLogo from './ClubLogo';
+import { registerMemberToSupabase } from '../lib/supabase';
 
 export default function RegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
   const [submitted, setSubmitted] = useState(false);
@@ -17,12 +18,16 @@ export default function RegistrationModal({ isOpen, onClose, onRegisterSuccess }
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.phone) return;
 
     const id = `BP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
     setMemberId(id);
+    
+    // Save to Supabase (or demo fallback)
+    await registerMemberToSupabase({ ...formData, memberId: id });
+
     setSubmitted(true);
     if (onRegisterSuccess) {
       onRegisterSuccess({ ...formData, memberId: id });

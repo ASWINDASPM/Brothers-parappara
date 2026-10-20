@@ -1,15 +1,24 @@
 import React, { useState } from 'react';
 import { X, Calendar, MapPin, Clock, CheckCircle2, Ticket } from 'lucide-react';
+import { rsvpEventToSupabase } from '../lib/supabase';
 
 export default function EventModal({ event, onClose }) {
   const [rsvpName, setRsvpName] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  const [passCode, setPassCode] = useState('');
 
   if (!event) return null;
 
-  const handleRsvp = (e) => {
+  const handleRsvp = async (e) => {
     e.preventDefault();
     if (!rsvpName.trim()) return;
+
+    const code = `BP-${event.month}${event.day}-${Math.floor(100 + Math.random() * 900)}`;
+    setPassCode(code);
+
+    // Save RSVP to Supabase
+    await rsvpEventToSupabase(event.id, rsvpName.trim(), code);
+
     setConfirmed(true);
   };
 
@@ -81,7 +90,7 @@ export default function EventModal({ event, onClose }) {
                 You are registered for <strong>{event.title}</strong>. Admission is free for all club members.
               </p>
               <div className="inline-block px-3 py-1 bg-white rounded-lg text-xs font-mono font-bold text-slate-800 shadow-2xs">
-                PASS: BP-{event.month}{event.day}-{Math.floor(100 + Math.random() * 900)}
+                PASS: {passCode}
               </div>
             </div>
           ) : (
