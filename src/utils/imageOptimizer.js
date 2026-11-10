@@ -142,3 +142,4 @@ export async function convertToWebP(
     reader.readAsDataURL(file);
   });
 }
+
