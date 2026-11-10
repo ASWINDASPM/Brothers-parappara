@@ -157,9 +157,20 @@ export default function FooterSection({ clubDetails = CLUB_DETAILS, onNavigate, 
         {/* Bottom Bar */}
         <div className="pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
           <p>© 2026 Brothers Parappara. All rights reserved.</p>
-          <p className="hover:text-slate-400 transition-colors">
-            Designed & Developed by QuadCubes
-          </p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onOpenAdmin}
+              className="text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-1.5 font-semibold"
+              title="Open Supabase CMS Admin Panel"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Admin Portal</span>
+            </button>
+            <span className="text-slate-700">|</span>
+            <p className="hover:text-slate-400 transition-colors">
+              Designed & Developed by QuadCubes
+            </p>
+          </div>
         </div>
 
       </div>

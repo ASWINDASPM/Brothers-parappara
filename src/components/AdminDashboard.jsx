@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   Settings, 
@@ -22,11 +22,34 @@ import {
   ExternalLink,
   ShieldCheck,
   Download,
-  Database
+  Database,
+  Loader2,
+  RefreshCw,
+  User,
+  AlertCircle,
+  Sparkles
 } from 'lucide-react';
 import ClubLogo from './ClubLogo';
-import { isSupabaseConfigured } from '../lib/supabase';
-import { checkAdminPassword, setAdminPassword, adminLogout } from '../utils/cmsStorage';
+import { 
+  isSupabaseConfigured, 
+  signInAdminWithSupabase, 
+  signOutAdminFromSupabase, 
+  getAdminSession, 
+  onAdminAuthStateChange,
+  getMembersFromSupabase,
+  updateMemberStatusInSupabase,
+  deleteMemberFromSupabase,
+  getContactMessagesFromSupabase,
+  deleteContactMessageFromSupabase,
+  getRsvpsFromSupabase,
+  createEventInSupabase,
+  deleteEventFromSupabase,
+  createNewsInSupabase,
+  deleteNewsFromSupabase,
+  createGalleryInSupabase,
+  deleteGalleryFromSupabase
+} from '../lib/supabase';
+import { checkAdminPassword, setAdminPassword, adminLogout, isAdminLoggedIn } from '../utils/cmsStorage';
 
 export default function AdminDashboard({ 
   cmsData, 
@@ -36,11 +59,16 @@ export default function AdminDashboard({
   onShowToast 
 }) {
   // Authentication State
+  const [currentUser, setCurrentUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('bp_club_admin_logged_in_v1') === 'true';
+    return isAdminLoggedIn();
   });
+  const [authMode, setAuthMode] = useState('supabase'); // 'supabase' | 'local'
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // Active CMS Tab
   const [activeTab, setActiveTab] = useState('overview'); // overview, general, slides, activities, events, members, gallery, news, messages
@@ -109,21 +137,164 @@ export default function AdminDashboard({
     scriptBottom: 'Together We Grow'
   });
 
+  // 1. Session Restoration & Auth Listener
+  useEffect(() => {
+    let mounted = true;
+
+    // Check existing Supabase session
+    getAdminSession().then(({ session, user }) => {
+      if (!mounted) return;
+      if (user) {
+        setCurrentUser(user);
+        setIsAuthenticated(true);
+      }
+    });
+
+    // Listen to Supabase auth state changes
+    const { data: { subscription } } = onAdminAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if (session?.user) {
+        setCurrentUser(session.user);
+        setIsAuthenticated(true);
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe?.();
+    };
+  }, []);
+
+  // 2. Fetch live data from Supabase once authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !isSupabaseConfigured()) return;
+    let isMounted = true;
+
+    const fetchLiveSupabaseData = async () => {
+      setIsSyncing(true);
+      try {
+        const [membersRes, msgsRes, rsvpsRes, eventsRes, newsRes] = await Promise.all([
+          getMembersFromSupabase(),
+          getContactMessagesFromSupabase(),
+          getRsvpsFromSupabase(),
+          getEventsFromSupabase(),
+          getNewsFromSupabase()
+        ]);
+
+        if (!isMounted) return;
+
+        let updated = { ...cmsData };
+        let changed = false;
+
+        if (membersRes.data && membersRes.data.length > 0) {
+          const mappedMembers = membersRes.data.map(m => ({
+            id: m.id,
+            memberId: m.member_id || m.id,
+            name: m.name,
+            phone: m.phone,
+            email: m.email || '',
+            wing: m.wing,
+            ageGroup: m.age_group || 'Youth',
+            address: m.address || '',
+            status: m.status || 'Active',
+            joinedDate: m.created_at ? new Date(m.created_at).toISOString().split('T')[0] : '2026-10-18'
+          }));
+          updated.members = mappedMembers;
+          changed = true;
+        }
+
+        if (msgsRes.data && msgsRes.data.length > 0) {
+          const mappedMsgs = msgsRes.data.map(msg => ({
+            id: msg.id,
+            name: msg.name,
+            contact: msg.phone_or_email,
+            message: msg.message,
+            date: msg.created_at ? new Date(msg.created_at).toISOString().split('T')[0] : '2026-10-19'
+          }));
+          updated.messages = mappedMsgs;
+          changed = true;
+        }
+
+        if (rsvpsRes.data && rsvpsRes.data.length > 0) {
+          const mappedRsvps = rsvpsRes.data.map(r => ({
+            id: r.id,
+            eventId: r.event_id,
+            name: r.participant_name,
+            passCode: r.pass_code,
+            date: r.created_at ? new Date(r.created_at).toISOString().split('T')[0] : '2026-10-19'
+          }));
+          updated.rsvps = mappedRsvps;
+          changed = true;
+        }
+
+        if (changed) {
+          onUpdateCmsData(updated);
+        }
+      } catch (err) {
+        console.warn('Error fetching Supabase live data:', err);
+      } finally {
+        if (isMounted) setIsSyncing(false);
+      }
+    };
+
+    fetchLiveSupabaseData();
+  }, [isAuthenticated]);
+
   // Handle Login
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    if (checkAdminPassword(loginPassword)) {
-      setIsAuthenticated(true);
-      setLoginError('');
-      if (onShowToast) onShowToast('Admin authenticated successfully!');
+    setLoginError('');
+
+    if (authMode === 'supabase') {
+      if (!loginEmail || !loginPassword) {
+        setLoginError('Please enter both your Supabase admin email and password.');
+        return;
+      }
+      setIsAuthLoading(true);
+      try {
+        const { data, error } = await signInAdminWithSupabase(loginEmail, loginPassword);
+        setIsAuthLoading(false);
+        if (error) {
+          console.error('Supabase auth error:', error);
+          if (error.message.includes('Invalid login credentials')) {
+            setLoginError('Invalid email or password. Please verify your Supabase user credentials.');
+          } else if (error.message.includes('Email not confirmed')) {
+            setLoginError('Email not confirmed yet. In Supabase Dashboard > Authentication > Users, you can manually verify it, or disable "Confirm email" in Auth settings.');
+          } else {
+            setLoginError(error.message || 'Supabase authentication failed.');
+          }
+        } else if (data?.user) {
+          setCurrentUser(data.user);
+          setIsAuthenticated(true);
+          if (onShowToast) onShowToast(`Welcome back, ${data.user.email}!`);
+        }
+      } catch (err) {
+        setIsAuthLoading(false);
+        setLoginError(err.message || 'Network error connecting to Supabase Auth.');
+      }
     } else {
-      setLoginError('Incorrect password. Default is: admin123');
+      // Local Password Fallback
+      if (checkAdminPassword(loginPassword)) {
+        setIsAuthenticated(true);
+        setLoginError('');
+        if (onShowToast) onShowToast('Admin authenticated via master password!');
+      } else {
+        setLoginError('Incorrect password. Default master password is: admin123');
+      }
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOutAdminFromSupabase();
+    } catch (err) {}
     adminLogout();
     setIsAuthenticated(false);
+    setCurrentUser(null);
+    if (onShowToast) onShowToast('Signed out from Admin Dashboard.');
   };
 
   // General Details Save
@@ -196,10 +367,12 @@ export default function AdminDashboard({
     if (onShowToast) onShowToast('Event fixture updated!');
   };
 
-  const handleAddEvent = (e) => {
+  const handleAddEvent = async (e) => {
     e.preventDefault();
     if (!newEventDraft.title) return;
-    const updated = [{ ...newEventDraft, id: `evt-${Date.now()}` }, ...cmsData.events];
+    const newId = `evt-${Date.now()}`;
+    const newEvt = { ...newEventDraft, id: newId };
+    const updated = [newEvt, ...cmsData.events];
     onUpdateCmsData({ ...cmsData, events: updated });
     setShowAddEventModal(false);
     setNewEventDraft({
@@ -212,13 +385,16 @@ export default function AdminDashboard({
       category: 'Sports',
       description: ''
     });
+    // Sync to Supabase in background
+    createEventInSupabase(newEvt).catch(err => console.warn('Supabase event create error:', err));
     if (onShowToast) onShowToast('New event scheduled!');
   };
 
-  const handleDeleteEvent = (id) => {
+  const handleDeleteEvent = async (id) => {
     if (window.confirm('Delete this event?')) {
       const updated = cmsData.events.filter(e => e.id !== id);
       onUpdateCmsData({ ...cmsData, events: updated });
+      deleteEventFromSupabase(id).catch(err => console.warn('Supabase event delete error:', err));
       if (onShowToast) onShowToast('Event deleted.');
     }
   };
@@ -231,10 +407,12 @@ export default function AdminDashboard({
     if (onShowToast) onShowToast('Bulletin updated!');
   };
 
-  const handleAddNews = (e) => {
+  const handleAddNews = async (e) => {
     e.preventDefault();
     if (!newNewsDraft.title || !newNewsDraft.content) return;
-    const updated = [{ ...newNewsDraft, id: `news-${Date.now()}` }, ...cmsData.news];
+    const newId = `news-${Date.now()}`;
+    const newNews = { ...newNewsDraft, id: newId };
+    const updated = [newNews, ...cmsData.news];
     onUpdateCmsData({ ...cmsData, news: updated });
     setShowAddNewsModal(false);
     setNewNewsDraft({
@@ -244,22 +422,26 @@ export default function AdminDashboard({
       content: '',
       author: 'Club Secretary'
     });
+    createNewsInSupabase(newNews).catch(err => console.warn('Supabase news create error:', err));
     if (onShowToast) onShowToast('Bulletin posted live!');
   };
 
-  const handleDeleteNews = (id) => {
+  const handleDeleteNews = async (id) => {
     if (window.confirm('Delete this news notice?')) {
       const updated = cmsData.news.filter(n => n.id !== id);
       onUpdateCmsData({ ...cmsData, news: updated });
+      deleteNewsFromSupabase(id).catch(err => console.warn('Supabase news delete error:', err));
       if (onShowToast) onShowToast('Notice removed.');
     }
   };
 
   // Gallery Operations
-  const handleAddGallery = (e) => {
+  const handleAddGallery = async (e) => {
     e.preventDefault();
     if (!newGalleryDraft.title || !newGalleryDraft.image) return;
-    const updated = [{ ...newGalleryDraft, id: `gal-${Date.now()}` }, ...cmsData.gallery];
+    const newId = `gal-${Date.now()}`;
+    const newGal = { ...newGalleryDraft, id: newId };
+    const updated = [newGal, ...cmsData.gallery];
     onUpdateCmsData({ ...cmsData, gallery: updated });
     setShowAddGalleryModal(false);
     setNewGalleryDraft({
@@ -269,32 +451,38 @@ export default function AdminDashboard({
       isVideo: false,
       description: ''
     });
+    createGalleryInSupabase(newGal).catch(err => console.warn('Supabase gallery create error:', err));
     if (onShowToast) onShowToast('Showcase highlight added!');
   };
 
-  const handleDeleteGallery = (id) => {
+  const handleDeleteGallery = async (id) => {
     if (window.confirm('Remove this photo/video from gallery?')) {
       const updated = cmsData.gallery.filter(g => g.id !== id);
       onUpdateCmsData({ ...cmsData, gallery: updated });
+      deleteGalleryFromSupabase(id).catch(err => console.warn('Supabase gallery delete error:', err));
       if (onShowToast) onShowToast('Gallery item removed.');
     }
   };
 
   // Member Status toggle & delete
-  const handleToggleMemberStatus = (id) => {
+  const handleToggleMemberStatus = async (id) => {
+    let nextStatus = 'Active';
     const updated = cmsData.members.map(m => {
       if (m.id === id) {
-        return { ...m, status: m.status === 'Active' ? 'Pending' : 'Active' };
+        nextStatus = m.status === 'Active' ? 'Pending' : 'Active';
+        return { ...m, status: nextStatus };
       }
       return m;
     });
     onUpdateCmsData({ ...cmsData, members: updated });
+    updateMemberStatusInSupabase(id, nextStatus).catch(err => console.warn('Supabase member status update error:', err));
   };
 
-  const handleDeleteMember = (id) => {
+  const handleDeleteMember = async (id) => {
     if (window.confirm('Remove this member from roster?')) {
       const updated = cmsData.members.filter(m => m.id !== id);
       onUpdateCmsData({ ...cmsData, members: updated });
+      deleteMemberFromSupabase(id).catch(err => console.warn('Supabase member delete error:', err));
       if (onShowToast) onShowToast('Member removed.');
     }
   };
@@ -323,9 +511,10 @@ export default function AdminDashboard({
   };
 
   // Message delete
-  const handleDeleteMessage = (id) => {
+  const handleDeleteMessage = async (id) => {
     const updated = cmsData.messages.filter(msg => msg.id !== id);
     onUpdateCmsData({ ...cmsData, messages: updated });
+    deleteContactMessageFromSupabase(id).catch(err => console.warn('Supabase message delete error:', err));
     if (onShowToast) onShowToast('Message deleted.');
   };
 
@@ -349,40 +538,125 @@ export default function AdminDashboard({
             <div className="inline-flex p-3 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
               <ShieldCheck className="w-8 h-8" />
             </div>
-            <h2 className="text-2xl font-black text-white">Brothers Parappara</h2>
-            <p className="text-xs text-slate-400 font-medium">CMS Admin Dashboard & Content Portal</p>
+            <h2 className="text-2xl font-black text-white tracking-tight">Brothers Parappara</h2>
+            <p className="text-xs text-slate-400 font-medium">CMS Admin Dashboard & Portal Control</p>
+            
+            {/* Supabase Connection Status Badge */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-slate-800/80 border border-slate-700/80 text-slate-300 mt-2">
+              <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured() ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
+              <span>{isSupabaseConfigured() ? 'Supabase Auth Ready' : 'Supabase Not Configured'}</span>
+            </div>
+          </div>
+
+          {/* Auth Method Selector */}
+          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => { setAuthMode('supabase'); setLoginError(''); }}
+              className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                authMode === 'supabase'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Supabase Auth</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAuthMode('local'); setLoginError(''); }}
+              className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                authMode === 'local'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Local Password</span>
+            </button>
           </div>
 
           <form onSubmit={handleLoginSubmit} className="space-y-4">
+            
+            {/* Supabase Email Input (only when Supabase mode) */}
+            {authMode === 'supabase' && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Supabase User Email
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="email"
+                    required
+                    placeholder="Enter your Supabase auth email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-800/80 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder-slate-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Password Input */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Admin Password
+                {authMode === 'supabase' ? 'Supabase Password' : 'Local Master Password'}
               </label>
               <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="w-4 h-4" />
+                </div>
                 <input
                   type="password"
                   required
-                  placeholder="Enter admin password"
+                  placeholder={authMode === 'supabase' ? 'Enter your password' : 'Enter master password'}
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 text-sm bg-slate-800/80 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-800/80 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder-slate-500"
                 />
               </div>
-              {loginError && (
-                <p className="text-xs text-rose-400 mt-1.5 font-medium">{loginError}</p>
-              )}
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 text-xs text-slate-400 flex items-center justify-between">
-              <span>Default Password:</span>
-              <code className="text-emerald-400 font-bold bg-slate-900 px-2 py-0.5 rounded">admin123</code>
-            </div>
+            {/* Error Message Box */}
+            {loginError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{loginError}</span>
+              </div>
+            )}
 
+            {/* Hint Box */}
+            {authMode === 'supabase' ? (
+              <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                <span className="text-emerald-400 font-semibold">Tip:</span> Use the email & password you created in your Supabase Auth dashboard.
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 text-xs text-slate-400 flex items-center justify-between">
+                <span>Default Password:</span>
+                <code className="text-emerald-400 font-bold bg-slate-900 px-2 py-0.5 rounded">admin123</code>
+              </div>
+            )}
+
+            {/* Submit Button */}
             <button
               type="submit"
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-emerald-950/40"
+              disabled={isAuthLoading}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2"
             >
-              Access Admin CMS
+              {isAuthLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Authenticating with Supabase...</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{authMode === 'supabase' ? 'Sign In with Supabase' : 'Access Admin CMS'}</span>
+                </>
+              )}
             </button>
           </form>
 
@@ -420,41 +694,63 @@ export default function AdminDashboard({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Database indicator */}
-            <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-slate-800 border border-slate-700">
-              <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured() ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
-              <span className="text-slate-300 font-semibold text-[11px]">
-                {isSupabaseConfigured() ? 'Supabase Live' : 'Local Storage Mode'}
-              </span>
-            </div>
+          <div className="flex items-center gap-2.5">
+            
+            {/* Supabase User & Live Status */}
+            {currentUser?.email ? (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-emerald-300 font-semibold truncate max-w-[150px] sm:max-w-[200px]" title={currentUser.email}>
+                  {currentUser.email}
+                </span>
+                <span className="hidden md:inline-block text-[10px] font-bold uppercase tracking-wider bg-emerald-950/80 text-emerald-400 px-1.5 py-0.5 rounded">
+                  Supabase
+                </span>
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-slate-800 border border-slate-700">
+                <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured() ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className="text-slate-300 font-semibold text-[11px]">
+                  {isSupabaseConfigured() ? 'Supabase Live' : 'Local Storage Mode'}
+                </span>
+              </div>
+            )}
+
+            {/* Syncing spinner */}
+            {isSyncing && (
+              <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-400">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                <span>Syncing Supabase...</span>
+              </div>
+            )}
 
             {/* Reset Defaults */}
             <button
               onClick={handleReset}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
               title="Reset all CMS content to original default seed data"
             >
               <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-              <span>Reset Defaults</span>
+              <span>Reset</span>
             </button>
 
             {/* Back to Live Site Button */}
             <button
               onClick={onExitAdmin}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition-all"
             >
-              <Eye className="w-4 h-4" />
-              <span>View Live Website</span>
+              <Eye className="w-3.5 h-3.5" />
+              <span>View Website</span>
             </button>
 
             {/* Logout */}
             <button
               onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-rose-400 rounded-xl hover:bg-slate-800 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-rose-400 hover:bg-slate-800 transition-colors"
               title="Logout from CMS"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
 
