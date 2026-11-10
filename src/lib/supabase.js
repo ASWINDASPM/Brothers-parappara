@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { UPCOMING_EVENTS, NEWS_UPDATES, GALLERY_MOMENTS } from '../data/mockData';
+import { convertToWebP } from '../utils/imageOptimizer';
 
 const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 // Strip trailing /rest/v1 or /rest/v1/ or trailing slash
@@ -456,10 +457,10 @@ export async function ensureImageBucketExists() {
 }
 
 /**
- * Upload an image file to the Supabase Storage bucket
+ * Upload an image file to the Supabase Storage bucket, converting to WebP first
  * @param {File} file - browser File object
  * @param {string} folder - subfolder e.g. 'events', 'gallery', 'slides', 'activities'
- * @returns {Promise<{ url: string | null, error: any }>}
+ * @returns {Promise<{ url: string | null, error: any, savingsPercent?: number }>}
  */
 export async function uploadImageToSupabase(file, folder = 'general') {
   if (!isSupabaseConfigured() || !supabase) {
@@ -467,15 +468,23 @@ export async function uploadImageToSupabase(file, folder = 'general') {
   }
 
   try {
-    // Sanitize filename & create unique path
-    const cleanName = (file.name || 'image.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
+    // 1. Convert image to WebP before upload
+    const { file: optimizedFile, savingsPercent, isConverted } = await convertToWebP(file);
+
+    // 2. Sanitize filename & ensure .webp extension
+    let cleanName = (optimizedFile.name || 'image.webp').replace(/[^a-zA-Z0-9.-]/g, '_');
+    if (isConverted && !cleanName.endsWith('.webp')) {
+      cleanName = cleanName.replace(/\.[^/.]+$/, "") + '.webp';
+    }
+
     const filePath = `${folder}/${Date.now()}_${cleanName}`;
 
-    // Upload to Supabase Storage
+    // 3. Upload the optimized WebP to Supabase Storage
     const { data, error } = await supabase.storage
       .from(IMAGES_BUCKET)
-      .upload(filePath, file, {
-        cacheControl: '3600',
+      .upload(filePath, optimizedFile, {
+        contentType: 'image/webp',
+        cacheControl: '31536000', // 1 year cache for static webp assets
         upsert: true
       });
 
@@ -484,12 +493,17 @@ export async function uploadImageToSupabase(file, folder = 'general') {
       return { url: null, error };
     }
 
-    // Retrieve public URL
+    // 4. Retrieve public CDN URL
     const { data: publicData } = supabase.storage
       .from(IMAGES_BUCKET)
       .getPublicUrl(filePath);
 
-    return { url: publicData.publicUrl, error: null };
+    return { 
+      url: publicData.publicUrl, 
+      error: null,
+      savingsPercent,
+      isConverted 
+    };
   } catch (err) {
     console.error('Storage upload exception:', err);
     return { url: null, error: err };

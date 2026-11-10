@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, X, ExternalLink } from 'lucide-react';
+import { UploadCloud, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, X, ExternalLink, Zap } from 'lucide-react';
 import { uploadImageToSupabase } from '../lib/supabase';
 
 export default function ImageUploadField({ 
@@ -7,30 +7,34 @@ export default function ImageUploadField({
   value = "", 
   onChange, 
   folder = "general",
-  helpText = "Upload high-quality PNG, JPG, or WebP (max 10MB)"
+  helpText = "Auto-converted to modern WebP for optimal speed & quality"
 }) {
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploadStep, setUploadStep] = useState(""); // "" | "converting" | "uploading"
   const [uploadError, setUploadError] = useState("");
-  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [successInfo, setSuccessInfo] = useState(null); // { savings: number }
   const fileInputRef = useRef(null);
+
+  const isUploading = Boolean(uploadStep);
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check size (10 MB limit)
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError("Image file size must be less than 10MB.");
+    // Check size limit (max 15MB before WebP compression)
+    if (file.size > 15 * 1024 * 1024) {
+      setUploadError("Image file size must be less than 15MB.");
       return;
     }
 
     setUploadError("");
-    setUploadSuccess(false);
-    setIsUploading(true);
+    setSuccessInfo(null);
+    setUploadStep("converting");
 
     try {
-      const { url, error } = await uploadImageToSupabase(file, folder);
-      setIsUploading(false);
+      // Step 1: Converting to WebP and uploading
+      setUploadStep("uploading");
+      const { url, error, savingsPercent } = await uploadImageToSupabase(file, folder);
+      setUploadStep("");
 
       if (error) {
         console.error("Image upload failed:", error);
@@ -39,11 +43,11 @@ export default function ImageUploadField({
         );
       } else if (url) {
         onChange(url);
-        setUploadSuccess(true);
-        setTimeout(() => setUploadSuccess(false), 4000);
+        setSuccessInfo({ savingsPercent: savingsPercent || 0 });
+        setTimeout(() => setSuccessInfo(null), 5000);
       }
     } catch (err) {
-      setIsUploading(false);
+      setUploadStep("");
       setUploadError(err.message || "Network error uploading image.");
     } finally {
       // Reset input
@@ -52,6 +56,8 @@ export default function ImageUploadField({
       }
     }
   };
+
+  const isWebPUrl = Boolean(value && (value.includes('.webp') || value.includes('webp')));
 
   return (
     <div className="space-y-2">
@@ -78,15 +84,22 @@ export default function ImageUploadField({
         {/* Thumbnail Preview */}
         <div className="w-20 h-16 rounded-xl bg-slate-200 border border-slate-300 overflow-hidden shrink-0 flex items-center justify-center relative group">
           {value ? (
-            <img
-              src={value}
-              alt="Uploaded preview"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=400&q=80";
-              }}
-            />
+            <>
+              <img
+                src={value}
+                alt="Uploaded preview"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=400&q=80";
+                }}
+              />
+              {isWebPUrl && (
+                <span className="absolute bottom-1 right-1 px-1 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-950/80 text-emerald-300 border border-emerald-500/40">
+                  WEBP
+                </span>
+              )}
+            </>
           ) : (
             <ImageIcon className="w-6 h-6 text-slate-400" />
           )}
@@ -109,7 +122,12 @@ export default function ImageUploadField({
               onClick={() => fileInputRef.current?.click()}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-xs transition-all disabled:opacity-60"
             >
-              {isUploading ? (
+              {uploadStep === "converting" ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                  <span>Converting to WebP...</span>
+                </>
+              ) : uploadStep === "uploading" ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
                   <span>Uploading to Supabase...</span>
@@ -117,7 +135,7 @@ export default function ImageUploadField({
               ) : (
                 <>
                   <UploadCloud className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Upload to Supabase Bucket</span>
+                  <span>Upload to Supabase (Auto WebP)</span>
                 </>
               )}
             </button>
@@ -135,8 +153,9 @@ export default function ImageUploadField({
             )}
           </div>
 
-          <p className="text-[11px] text-slate-400 leading-tight">
-            {helpText}
+          <p className="text-[11px] text-slate-400 leading-tight flex items-center gap-1">
+            <Zap className="w-3 h-3 text-amber-500 shrink-0" />
+            <span>{helpText}</span>
           </p>
         </div>
 
@@ -154,10 +173,13 @@ export default function ImageUploadField({
       </div>
 
       {/* Status Messages */}
-      {uploadSuccess && (
+      {successInfo && (
         <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold animate-in fade-in">
           <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>Image uploaded successfully to `club-images` bucket!</span>
+          <span>
+            Converted to WebP & uploaded successfully!
+            {successInfo.savingsPercent > 0 && ` (${successInfo.savingsPercent}% size reduction)`}
+          </span>
         </div>
       )}
 
