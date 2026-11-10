@@ -6,10 +6,14 @@ import {
   Mail, 
   Facebook, 
   Instagram, 
-  Youtube 
+  Youtube,
+  ShieldCheck 
 } from 'lucide-react';
+import { CLUB_DETAILS } from '../data/mockData';
 
-export default function FooterSection({ onNavigate }) {
+export default function FooterSection({ clubDetails = CLUB_DETAILS, onNavigate, onOpenAdmin }) {
+  const details = clubDetails || CLUB_DETAILS;
+
   return (
     <footer className="bg-[#0b192c] text-white pt-14 pb-8 border-t border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
@@ -24,18 +28,18 @@ export default function FooterSection({ onNavigate }) {
             <div className="space-y-2.5 pt-2 text-xs text-slate-300 font-medium">
               <div className="flex items-center gap-2.5">
                 <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Parappara, Kerala, India</span>
+                <span>{details.contact?.address || 'Parappara, Kerala, India'}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
-                <a href="tel:+919876543210" className="hover:text-emerald-400 transition-colors">
-                  +91 98765 43210
+                <a href={`tel:${details.contact?.phone || '+919876543210'}`} className="hover:text-emerald-400 transition-colors">
+                  {details.contact?.phone || '+91 98765 43210'}
                 </a>
               </div>
               <div className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
-                <a href="mailto:info@brothersparappara.org" className="hover:text-emerald-400 transition-colors">
-                  info@brothersparappara.org
+                <a href={`mailto:${details.contact?.email || 'info@brothersparappara.org'}`} className="hover:text-emerald-400 transition-colors">
+                  {details.contact?.email || 'info@brothersparappara.org'}
                 </a>
               </div>
             </div>

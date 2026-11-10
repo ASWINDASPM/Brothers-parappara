@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { ArrowRight, Play, X, Eye } from 'lucide-react';
 import { GALLERY_MOMENTS } from '../data/mockData';
 
-export default function GallerySection({ onViewAllGallery }) {
+export default function GallerySection({ gallery = GALLERY_MOMENTS, onViewAllGallery }) {
   const [activePhoto, setActivePhoto] = useState(null);
+  const items = gallery || GALLERY_MOMENTS;
 
   return (
     <section id="gallery" className="py-14 sm:py-18 bg-white">
@@ -34,7 +35,7 @@ export default function GallerySection({ onViewAllGallery }) {
 
         {/* 6 Images Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-          {GALLERY_MOMENTS.map((item) => (
+          {items.map((item) => (
             <div
               key={item.id}
               onClick={() => setActivePhoto(item)}

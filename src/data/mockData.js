@@ -195,3 +195,95 @@ export const NEWS_UPDATES = [
     author: "Executive Committee"
   }
 ];
+
+export const INITIAL_HERO_SLIDES = [
+  {
+    id: "slide-1",
+    image: "https://images.unsplash.com/photo-1526232761682-d26e03ac148e?auto=format&fit=crop&w=2000&q=85",
+    welcomeTag: "WELCOME TO",
+    title: "Brothers Parappara",
+    subtitle: "Local Arts & Sports Club",
+    tagline: "Together in Sports, United in Arts, Stronger as a Community.",
+    scriptTop: "Sports | Arts | Community",
+    scriptBottom: "Together We Grow"
+  },
+  {
+    id: "slide-2",
+    image: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=2000&q=85",
+    welcomeTag: "CELEBRATING HERITAGE",
+    title: "Brothers Parappara",
+    subtitle: "Arts & Cultural Guild",
+    tagline: "Preserving vibrant Kerala stage traditions, dance, music & theatre.",
+    scriptTop: "Culture | Heritage | Passion",
+    scriptBottom: "United in Expression"
+  },
+  {
+    id: "slide-3",
+    image: "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=2000&q=85",
+    welcomeTag: "COMMUNITY CHAMPIONS",
+    title: "Brothers Parappara",
+    subtitle: "Youth Athletics & Football",
+    tagline: "Fostering teamwork, grassroots coaching, and sportsmanship on our home turf.",
+    scriptTop: "Play | Compete | Excel",
+    scriptBottom: "Champions Together"
+  }
+];
+
+export const INITIAL_MEMBERS = [
+  {
+    id: "mem-1",
+    name: "Rahul Varma",
+    phone: "+91 98471 23456",
+    email: "rahul.v@gmail.com",
+    wing: "Football Squad",
+    ageGroup: "Youth (15-22 yrs)",
+    address: "Parappara North Ward",
+    memberId: "BP-2026-1042",
+    status: "Active",
+    joinedDate: "2026-10-12"
+  },
+  {
+    id: "mem-2",
+    name: "Ananya Nair",
+    phone: "+91 97456 78901",
+    email: "ananya.n@gmail.com",
+    wing: "Arts & Culture Guild",
+    ageGroup: "Youth (15-22 yrs)",
+    address: "Temple Road, Parappara",
+    memberId: "BP-2026-2189",
+    status: "Active",
+    joinedDate: "2026-10-14"
+  },
+  {
+    id: "mem-3",
+    name: "Sujith Kumar",
+    phone: "+91 94470 54321",
+    email: "sujith.k@yahoo.com",
+    wing: "Cricket Club",
+    ageGroup: "Seniors (23-35 yrs)",
+    address: "School Junction, Parappara",
+    memberId: "BP-2026-3305",
+    status: "Active",
+    joinedDate: "2026-10-15"
+  }
+];
+
+export const INITIAL_MESSAGES = [
+  {
+    id: "msg-1",
+    name: "Vivek George",
+    phone: "+91 98950 11223",
+    message: "Interested in enrolling our local youth team for the Annual Football Tournament on Nov 15. Please send registration guidelines.",
+    date: "2026-10-18",
+    status: "Unread"
+  },
+  {
+    id: "msg-2",
+    name: "Deepa Krishnan",
+    phone: "deepa.k@gmail.com",
+    message: "Would love to volunteer for the Cultural Evening stage setup on Nov 28. Let me know when committee meetings are held.",
+    date: "2026-10-16",
+    status: "Read"
+  }
+];
+

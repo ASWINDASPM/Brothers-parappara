@@ -2,7 +2,9 @@ import React from 'react';
 import { ArrowRight, MapPin, Clock, ChevronRight } from 'lucide-react';
 import { UPCOMING_EVENTS } from '../data/mockData';
 
-export default function UpcomingEventsSection({ onSelectEvent, onViewAllEvents }) {
+export default function UpcomingEventsSection({ events = UPCOMING_EVENTS, onSelectEvent, onViewAllEvents }) {
+  const items = events || UPCOMING_EVENTS;
+
   return (
     <section id="events" className="py-16 sm:py-20 bg-emerald-50/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -37,7 +39,7 @@ export default function UpcomingEventsSection({ onSelectEvent, onViewAllEvents }
           {/* Right Column: 3 Event Cards with Scroll Arrow */}
           <div className="lg:col-span-8 relative">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              {UPCOMING_EVENTS.map((evt) => (
+              {items.map((evt) => (
                 <div
                   key={evt.id}
                   onClick={() => onSelectEvent && onSelectEvent(evt)}

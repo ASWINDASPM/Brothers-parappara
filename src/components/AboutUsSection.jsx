@@ -1,7 +1,10 @@
 import React from 'react';
 import { ArrowRight, Leaf, Target } from 'lucide-react';
+import { CLUB_DETAILS } from '../data/mockData';
 
-export default function AboutUsSection({ onLearnMoreClick }) {
+export default function AboutUsSection({ clubDetails = CLUB_DETAILS, onLearnMoreClick }) {
+  const details = clubDetails || CLUB_DETAILS;
+
   return (
     <section id="about" className="py-16 sm:py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -26,14 +29,14 @@ export default function AboutUsSection({ onLearnMoreClick }) {
                     BP
                   </div>
                   <span className="font-black text-sm tracking-widest text-slate-900 uppercase">
-                    BROTHERS PARAPPARA
+                    {details.name || 'BROTHERS PARAPPARA'}
                   </span>
                 </div>
 
                 {/* Subtext info */}
                 <div className="text-white text-xs">
                   <span className="font-bold text-emerald-400">Club Grounds & Cultural Center</span>
-                  <p className="text-slate-300 text-[11px]">Parappara, Kerala • Est. Community Guild</p>
+                  <p className="text-slate-300 text-[11px]">{details.contact?.address || 'Parappara, Kerala'} • Est. Community Guild</p>
                 </div>
               </div>
             </div>
@@ -49,12 +52,12 @@ export default function AboutUsSection({ onLearnMoreClick }) {
 
             {/* Heading */}
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-              Our Club, Our Pride
+              {details.aboutHeading || 'Our Club, Our Pride'}
             </h2>
 
             {/* Description Paragraph */}
             <p className="text-sm text-slate-600 leading-relaxed">
-              Brothers Parappara is a well-recognized local arts and sports club that brings together people of all ages through sports, arts and community activities. Our club aims to create a vibrant platform for talent, friendship and togetherness, while contributing to the growth and well-being of our community.
+              {details.aboutText || 'Brothers Parappara is a well-recognized local arts and sports club that brings together people of all ages through sports, arts and community activities.'}
             </p>
 
             {/* "Learn More →" Button */}
@@ -82,7 +85,7 @@ export default function AboutUsSection({ onLearnMoreClick }) {
                 Our Vision
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                To build a united, active and culturally rich community.
+                {details.vision || 'To build a united, active and culturally rich community.'}
               </p>
             </div>
 
@@ -95,7 +98,7 @@ export default function AboutUsSection({ onLearnMoreClick }) {
                 Our Mission
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                To promote sports, arts and social welfare through inclusive and sustainable initiatives.
+                {details.mission || 'To promote sports, arts and social welfare through inclusive and sustainable initiatives.'}
               </p>
             </div>
 

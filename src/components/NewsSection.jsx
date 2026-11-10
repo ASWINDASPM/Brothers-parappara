@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { ArrowRight, Megaphone, Trophy, Calendar, X } from 'lucide-react';
 import { NEWS_UPDATES } from '../data/mockData';
 
-export default function NewsSection({ onViewAllNews }) {
+export default function NewsSection({ news = NEWS_UPDATES, onViewAllNews }) {
   const [selectedNews, setSelectedNews] = useState(null);
+  const items = news || NEWS_UPDATES;
 
   const getNewsIcon = (tag) => {
     switch (tag) {
@@ -47,7 +48,7 @@ export default function NewsSection({ onViewAllNews }) {
 
         {/* 3 News Cards Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {NEWS_UPDATES.map((item) => (
+          {items.map((item) => (
             <div
               key={item.id}
               onClick={() => setSelectedNews(item)}

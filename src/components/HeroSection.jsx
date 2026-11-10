@@ -1,51 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { INITIAL_HERO_SLIDES } from '../data/mockData';
 
-export default function HeroSection({ onExploreClick }) {
+export default function HeroSection({ slides = INITIAL_HERO_SLIDES, onExploreClick }) {
   const [currentSlide, setCurrentSlide] = useState(0);
-
-  const slides = [
-    {
-      id: 1,
-      image: "https://images.unsplash.com/photo-1526232761682-d26e03ac148e?auto=format&fit=crop&w=2000&q=85",
-      welcomeTag: "WELCOME TO",
-      title: "Brothers Parappara",
-      subtitle: "Local Arts & Sports Club",
-      tagline: "Together in Sports, United in Arts, Stronger as a Community.",
-      scriptTop: "Sports | Arts | Community",
-      scriptBottom: "Together We Grow"
-    },
-    {
-      id: 2,
-      image: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=2000&q=85",
-      welcomeTag: "CELEBRATING HERITAGE",
-      title: "Brothers Parappara",
-      subtitle: "Arts & Cultural Guild",
-      tagline: "Preserving vibrant Kerala stage traditions, dance, music & theatre.",
-      scriptTop: "Culture | Heritage | Passion",
-      scriptBottom: "United in Expression"
-    },
-    {
-      id: 3,
-      image: "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=2000&q=85",
-      welcomeTag: "COMMUNITY CHAMPIONS",
-      title: "Brothers Parappara",
-      subtitle: "Youth Athletics & Football",
-      tagline: "Fostering teamwork, grassroots coaching, and sportsmanship on our home turf.",
-      scriptTop: "Play | Compete | Excel",
-      scriptBottom: "Champions Together"
-    }
-  ];
 
   // Auto slide cycle
   useEffect(() => {
+    if (!slides || slides.length === 0) return;
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
     }, 7000);
     return () => clearInterval(timer);
-  }, [slides.length]);
+  }, [slides]);
 
-  const active = slides[currentSlide];
+  if (!slides || slides.length === 0) return null;
+  const active = slides[currentSlide % slides.length];
 
   return (
     <section className="relative w-full h-[520px] sm:h-[580px] lg:h-[640px] overflow-hidden bg-slate-950 select-none">

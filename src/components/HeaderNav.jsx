@@ -6,14 +6,16 @@ import {
   X,
   Facebook,
   Instagram,
-  Youtube
+  Youtube,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function HeaderNav({ 
   activeSection, 
   onNavigate, 
   onOpenSearch, 
-  onOpenContact 
+  onOpenContact,
+  onOpenAdmin 
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -109,6 +111,15 @@ export default function HeaderNav({
             >
               <Search className="w-4 h-4" />
             </button>
+
+            <button
+              onClick={onOpenAdmin}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-900 hover:bg-emerald-700 text-white transition-all shadow-xs"
+              title="Open Admin CMS"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Admin</span>
+            </button>
           </div>
 
           {/* Mobile Menu Button */}
@@ -148,17 +159,30 @@ export default function HeaderNav({
               {link.label}
             </button>
           ))}
-          <div className="flex items-center gap-4 pt-4 mt-3 border-t border-slate-100 text-slate-600">
-            <span className="text-xs font-semibold text-slate-400">Follow us:</span>
-            <a href="https://facebook.com" target="_blank" rel="noreferrer" className="hover:text-emerald-600">
-              <Facebook className="w-4 h-4" />
-            </a>
-            <a href="https://instagram.com" target="_blank" rel="noreferrer" className="hover:text-emerald-600">
-              <Instagram className="w-4 h-4" />
-            </a>
-            <a href="https://youtube.com" target="_blank" rel="noreferrer" className="hover:text-emerald-600">
-              <Youtube className="w-4 h-4" />
-            </a>
+          <div className="flex items-center justify-between gap-4 pt-4 mt-3 border-t border-slate-100 text-slate-600">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-slate-400">Follow:</span>
+              <a href="https://facebook.com" target="_blank" rel="noreferrer" className="hover:text-emerald-600">
+                <Facebook className="w-4 h-4" />
+              </a>
+              <a href="https://instagram.com" target="_blank" rel="noreferrer" className="hover:text-emerald-600">
+                <Instagram className="w-4 h-4" />
+              </a>
+              <a href="https://youtube.com" target="_blank" rel="noreferrer" className="hover:text-emerald-600">
+                <Youtube className="w-4 h-4" />
+              </a>
+            </div>
+
+            <button
+              onClick={() => {
+                onOpenAdmin();
+                setMobileMenuOpen(false);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-900 text-white"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Admin CMS</span>
+            </button>
           </div>
         </div>
       )}

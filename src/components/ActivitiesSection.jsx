@@ -2,7 +2,8 @@ import React from 'react';
 import { ArrowRight, Trophy } from 'lucide-react';
 import { ACTIVITIES } from '../data/mockData';
 
-export default function ActivitiesSection({ onSelectActivity, onViewAllActivities }) {
+export default function ActivitiesSection({ activities = ACTIVITIES, onSelectActivity, onViewAllActivities }) {
+  const items = activities || ACTIVITIES;
   const getBadgeIcon = (icon) => {
     switch (icon) {
       case 'football':
@@ -71,7 +72,7 @@ export default function ActivitiesSection({ onSelectActivity, onViewAllActivitie
 
         {/* 4 Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {ACTIVITIES.map((act) => (
+          {items.map((act) => (
             <div
               key={act.id}
               onClick={() => onSelectActivity && onSelectActivity(act)}
