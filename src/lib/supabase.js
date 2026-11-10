@@ -423,3 +423,76 @@ export async function deleteGalleryFromSupabase(id) {
     return { error: err };
   }
 }
+
+// ========================================================
+// Supabase Storage Bucket API ('club-images')
+// ========================================================
+export const IMAGES_BUCKET = 'club-images';
+
+/**
+ * Ensure the public image bucket exists in Supabase
+ */
+export async function ensureImageBucketExists() {
+  if (!isSupabaseConfigured() || !supabase) return false;
+  try {
+    const { data: bucket, error: getErr } = await supabase.storage.getBucket(IMAGES_BUCKET);
+    if (!getErr && bucket) return true;
+
+    // Create bucket if not present
+    const { data, error } = await supabase.storage.createBucket(IMAGES_BUCKET, {
+      public: true,
+      fileSizeLimit: 10485760, // 10MB
+      allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']
+    });
+    if (error) {
+      console.warn('Auto create bucket notice (can also be created via SQL or dashboard):', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('ensureImageBucketExists notice:', err);
+    return false;
+  }
+}
+
+/**
+ * Upload an image file to the Supabase Storage bucket
+ * @param {File} file - browser File object
+ * @param {string} folder - subfolder e.g. 'events', 'gallery', 'slides', 'activities'
+ * @returns {Promise<{ url: string | null, error: any }>}
+ */
+export async function uploadImageToSupabase(file, folder = 'general') {
+  if (!isSupabaseConfigured() || !supabase) {
+    return { url: null, error: new Error('Supabase is not configured.') };
+  }
+
+  try {
+    // Sanitize filename & create unique path
+    const cleanName = (file.name || 'image.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filePath = `${folder}/${Date.now()}_${cleanName}`;
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from(IMAGES_BUCKET)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (error) {
+      console.error('Supabase storage upload error:', error);
+      return { url: null, error };
+    }
+
+    // Retrieve public URL
+    const { data: publicData } = supabase.storage
+      .from(IMAGES_BUCKET)
+      .getPublicUrl(filePath);
+
+    return { url: publicData.publicUrl, error: null };
+  } catch (err) {
+    console.error('Storage upload exception:', err);
+    return { url: null, error: err };
+  }
+}
+

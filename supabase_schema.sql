@@ -154,3 +154,48 @@ VALUES
 ('ACHIEVEMENT', 'Our Team Wins Inter-Club Football Championship', 'Oct 05, 2026', 'Hearty congratulations to Brothers Parappara FC for winning the prestigious Taluk Football Championship with a stellar 3-1 victory in the final match!', 'Sports Committee'),
 ('NOTICE', 'Club Maintenance This Sunday', 'Oct 02, 2026', 'A volunteer cleanup and ground maintenance drive will be held this Sunday starting at 7:30 AM. All members are requested to join hands in keeping our grounds green and clean.', 'Executive Committee')
 ON CONFLICT DO NOTHING;
+
+-- ============================================================
+-- 7. SUPABASE STORAGE BUCKET SETUP ('club-images')
+-- Run this in the Supabase SQL Editor to enable image uploads
+-- ============================================================
+
+-- Create the public bucket
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'club-images',
+    'club-images',
+    true,
+    10485760, -- 10 MB limit
+    ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']
+)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Drop existing policies if any to avoid duplicates
+DROP POLICY IF EXISTS "Public Access to club-images" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated uploads to club-images" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated update to club-images" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated delete to club-images" ON storage.objects;
+
+-- Allow anyone to view images publicly
+CREATE POLICY "Public Access to club-images"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'club-images');
+
+-- Allow authenticated admins to upload images
+CREATE POLICY "Allow authenticated uploads to club-images"
+ON storage.objects FOR INSERT
+TO authenticated, anon
+WITH CHECK (bucket_id = 'club-images');
+
+-- Allow updating and deleting images
+CREATE POLICY "Allow authenticated update to club-images"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id = 'club-images');
+
+CREATE POLICY "Allow authenticated delete to club-images"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'club-images');
+

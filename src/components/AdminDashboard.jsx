@@ -47,8 +47,10 @@ import {
   createNewsInSupabase,
   deleteNewsFromSupabase,
   createGalleryInSupabase,
-  deleteGalleryFromSupabase
+  deleteGalleryFromSupabase,
+  ensureImageBucketExists
 } from '../lib/supabase';
+import ImageUploadField from './ImageUploadField';
 import { checkAdminPassword, setAdminPassword, adminLogout, isAdminLoggedIn } from '../utils/cmsStorage';
 
 export default function AdminDashboard({ 
@@ -176,6 +178,9 @@ export default function AdminDashboard({
     const fetchLiveSupabaseData = async () => {
       setIsSyncing(true);
       try {
+        // Auto-check/create bucket if possible
+        ensureImageBucketExists().catch(() => {});
+
         const [membersRes, msgsRes, rsvpsRes, eventsRes, newsRes] = await Promise.all([
           getMembersFromSupabase(),
           getContactMessagesFromSupabase(),
@@ -1580,18 +1585,16 @@ export default function AdminDashboard({
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Banner Image URL</label>
-                <input
-                  type="url"
-                  value={editingEvent ? editingEvent.image : newEventDraft.image}
-                  onChange={(e) => editingEvent 
-                    ? setEditingEvent({ ...editingEvent, image: e.target.value })
-                    : setNewEventDraft({ ...newEventDraft, image: e.target.value })
-                  }
-                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200"
-                />
-              </div>
+              <ImageUploadField
+                label="Event Poster / Banner Image"
+                folder="events"
+                value={editingEvent ? editingEvent.image : newEventDraft.image}
+                onChange={(url) => editingEvent 
+                  ? setEditingEvent({ ...editingEvent, image: url })
+                  : setNewEventDraft({ ...newEventDraft, image: url })
+                }
+                helpText="Upload event poster to 'club-images' bucket or paste image link"
+              />
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Event Description</label>
@@ -1778,17 +1781,13 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Photo / Thumbnail URL</label>
-                <input
-                  type="url"
-                  required
-                  placeholder="https://images.unsplash.com/..."
-                  value={newGalleryDraft.image}
-                  onChange={(e) => setNewGalleryDraft({ ...newGalleryDraft, image: e.target.value })}
-                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200"
-                />
-              </div>
+              <ImageUploadField
+                label="Photo / Media Image"
+                folder="gallery"
+                value={newGalleryDraft.image}
+                onChange={(url) => setNewGalleryDraft({ ...newGalleryDraft, image: url })}
+                helpText="Upload match or event photo directly to 'club-images' bucket"
+              />
 
               <div className="pt-2 flex justify-end gap-2">
                 <button
@@ -1803,6 +1802,205 @@ export default function AdminDashboard({
                   className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs"
                 >
                   Add to Gallery
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL 4: ADD / EDIT HERO SLIDE */}
+      {/* ============================================================ */}
+      {(showAddSlideModal || editingSlide) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative my-6">
+            <button
+              onClick={() => { setShowAddSlideModal(false); setEditingSlide(null); }}
+              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-700 rounded-full"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <form onSubmit={editingSlide ? (e) => { e.preventDefault(); handleSaveSlide(editingSlide); } : handleAddSlide} className="space-y-4">
+              <h3 className="text-xl font-black text-slate-900">
+                {editingSlide ? 'Edit Hero Banner Slide' : 'Add New Hero Banner Slide'}
+              </h3>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Welcome Tag</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingSlide ? editingSlide.welcomeTag : newSlideDraft.welcomeTag}
+                    onChange={(e) => editingSlide 
+                      ? setEditingSlide({ ...editingSlide, welcomeTag: e.target.value })
+                      : setNewSlideDraft({ ...newSlideDraft, welcomeTag: e.target.value })
+                    }
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Club Main Title</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingSlide ? editingSlide.title : newSlideDraft.title}
+                    onChange={(e) => editingSlide 
+                      ? setEditingSlide({ ...editingSlide, title: e.target.value })
+                      : setNewSlideDraft({ ...newSlideDraft, title: e.target.value })
+                    }
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Subtitle</label>
+                <input
+                  type="text"
+                  required
+                  value={editingSlide ? editingSlide.subtitle : newSlideDraft.subtitle}
+                  onChange={(e) => editingSlide 
+                    ? setEditingSlide({ ...editingSlide, subtitle: e.target.value })
+                    : setNewSlideDraft({ ...newSlideDraft, subtitle: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Tagline</label>
+                <input
+                  type="text"
+                  required
+                  value={editingSlide ? editingSlide.tagline : newSlideDraft.tagline}
+                  onChange={(e) => editingSlide 
+                    ? setEditingSlide({ ...editingSlide, tagline: e.target.value })
+                    : setNewSlideDraft({ ...newSlideDraft, tagline: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200"
+                />
+              </div>
+
+              {/* Image Upload Field */}
+              <ImageUploadField
+                label="Slide Background Photo"
+                folder="slides"
+                value={editingSlide ? editingSlide.image : newSlideDraft.image}
+                onChange={(url) => editingSlide 
+                  ? setEditingSlide({ ...editingSlide, image: url })
+                  : setNewSlideDraft({ ...newSlideDraft, image: url })
+                }
+                helpText="High-res landscape photo (min 1920x800 recommended)"
+              />
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowAddSlideModal(false); setEditingSlide(null); }}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs"
+                >
+                  {editingSlide ? 'Update Slide' : 'Add Slide'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL 5: ADD / EDIT ACTIVITY */}
+      {/* ============================================================ */}
+      {(showAddActivityModal || editingActivity) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative my-6">
+            <button
+              onClick={() => { setShowAddActivityModal(false); setEditingActivity(null); }}
+              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-700 rounded-full"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <form onSubmit={editingActivity ? (e) => { e.preventDefault(); handleSaveActivity(editingActivity); } : handleAddActivity} className="space-y-4">
+              <h3 className="text-xl font-black text-slate-900">
+                {editingActivity ? 'Edit Activity Offering' : 'Add New Activity Offering'}
+              </h3>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Activity Title</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Football Academy"
+                  value={editingActivity ? editingActivity.title : newActivityDraft.title}
+                  onChange={(e) => editingActivity 
+                    ? setEditingActivity({ ...editingActivity, title: e.target.value })
+                    : setNewActivityDraft({ ...newActivityDraft, title: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Subtext / Catchphrase</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Grassroots to Championship training"
+                  value={editingActivity ? editingActivity.subtext : newActivityDraft.subtext}
+                  onChange={(e) => editingActivity 
+                    ? setEditingActivity({ ...editingActivity, subtext: e.target.value })
+                    : setNewActivityDraft({ ...newActivityDraft, subtext: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200"
+                />
+              </div>
+
+              {/* Image Upload Field */}
+              <ImageUploadField
+                label="Activity Card Image"
+                folder="activities"
+                value={editingActivity ? editingActivity.image : newActivityDraft.image}
+                onChange={(url) => editingActivity 
+                  ? setEditingActivity({ ...editingActivity, image: url })
+                  : setNewActivityDraft({ ...newActivityDraft, image: url })
+                }
+                helpText="Card preview image stored in 'club-images' bucket"
+              />
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
+                <textarea
+                  rows="2"
+                  value={editingActivity ? editingActivity.description : newActivityDraft.description}
+                  onChange={(e) => editingActivity 
+                    ? setEditingActivity({ ...editingActivity, description: e.target.value })
+                    : setNewActivityDraft({ ...newActivityDraft, description: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowAddActivityModal(false); setEditingActivity(null); }}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs"
+                >
+                  {editingActivity ? 'Update Activity' : 'Add Activity'}
                 </button>
               </div>
             </form>
